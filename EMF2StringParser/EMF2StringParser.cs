@@ -12,8 +12,8 @@ namespace EMF2StringParser
 {
     public class EMF2StringParser
     {
-        private bool isLoaded = false;
-        private bool isLogging = false;
+        public bool IsLoaded { get; set; } = false;
+        public bool isLoggingEnabled { get; set; } = false;
         private Graphics dummy = null;
         public Metafile metafileToParse { get; set; } = null;
         private EnumerateMetafileProc metafileDelegate = null;
@@ -55,7 +55,7 @@ namespace EMF2StringParser
         public void LoadMetaFile(Metafile newEmf)
         {
             metafileToParse = newEmf;
-            isLoaded = true;
+            IsLoaded = true;
         }
 
         /// <summary>
@@ -74,7 +74,7 @@ namespace EMF2StringParser
         public void LoadMetaFile(string path)
         {
             metafileToParse = new Metafile(path);
-            isLoaded = true;
+            IsLoaded = true;
         }
 
         /// <summary>
@@ -98,7 +98,7 @@ namespace EMF2StringParser
                 {
                     metafileToParse = new Metafile(stream);
                 }
-                isLoaded = true;
+                IsLoaded = true;
             }
             catch (Exception e)
             {
@@ -155,7 +155,7 @@ namespace EMF2StringParser
         /// <returns></returns>
         public bool ParseStart()
         {
-            if (isLoaded == false)
+            if (IsLoaded == false)
             {
                 throw new Exception("EMF File has not Loaded yet.");
             }
@@ -194,7 +194,7 @@ namespace EMF2StringParser
                     }
                     catch
                     {
-                        if (isLogging)
+                        if (isLoggingEnabled)
                         {
                             ParseFailingLogs.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
@@ -218,7 +218,7 @@ namespace EMF2StringParser
                     }
                     catch
                     {
-                        if (isLogging)
+                        if (isLoggingEnabled)
                         {
                             ParseFailingLogs.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
@@ -246,7 +246,7 @@ namespace EMF2StringParser
                     }
                     catch
                     {
-                        if (isLogging)
+                        if (isLoggingEnabled)
                         {
                             ParseFailingLogs.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
