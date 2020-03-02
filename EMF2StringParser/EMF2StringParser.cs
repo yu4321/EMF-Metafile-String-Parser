@@ -12,24 +12,45 @@ namespace EMF2StringParser
 {
     public class EMF2StringParser
     {
-        public bool IsLoaded { get; set; } = false;
-        public bool isLoggingEnabled { get; set; } = false;
+        private bool extractTextMode = false;
+        public bool IsLoaded { get; private set; } = false;
+        public bool IsFailedParseLoggingEnabled { get; set; } = false;
         private Graphics dummy = null;
-        public Metafile metafileToParse { get; set; } = null;
+
+        public Metafile metafileToParse { get; private set; } = null;
         private EnumerateMetafileProc metafileDelegate = null;
-        public List<string> ParsedExtTextOutWs { get; set; } = new List<string>();
+
         /// <summary>
-        /// Warning: Parsing for DrawString has never been tested on this version.
+        /// If records between text contains one of the members of this array, Linebreak(\n) will be added to ParsedExpectedText.
         /// </summary>
-        public List<string> ParsedDrawStrings { get; set; } = new List<string>();
+        public EmfPlusRecordType[] LineBreakCandidates { get; set; }
         /// <summary>
-        /// Warning: Parsing for EmfSmallTextOut is not works correctly on this version. 
+        /// If records between text contains all members of this array, Linebreak(\n) will be added to ParsedExpectedText.
         /// </summary>
-        public List<char> ParsedSmallTextOuts { get; set; } = new List<char>();
+        public EmfPlusRecordType[] MustLineBreak { get; set; }
         /// <summary>
-        /// Stores log if parsing failed in traversing.
+        /// If records between text contains one of the members of this array, Space(" ") will be added to ParsedExpectedText.
         /// </summary>
-        public List<KeyValuePair<EmfPlusRecordType, byte[]>> ParseFailingLogs { get; set; } = new List<KeyValuePair<EmfPlusRecordType, byte[]>>();
+        public EmfPlusRecordType[] SpaceCandidates { get; set; }
+        /// <summary>
+        /// If records between text contains all members of this array, Space(" ") will be added to ParsedExpectedText.
+        /// </summary>
+        public EmfPlusRecordType[] MustSpace { get; set; }
+
+        private List<EmfPlusRecordType> betweenTextCommands = new List<EmfPlusRecordType>();
+
+        private string parsedExpectedText= "";
+
+        public List<string> ParsedExtTextOutWs { get; private set; } = new List<string>();
+
+        public List<string> ParsedDrawStrings { get; private set; } = new List<string>();
+
+        public List<char> ParsedSmallTextOuts { get; private set; } = new List<char>();
+
+        /// <summary>
+        /// Stores record if it failed to be parsed in traversing.
+        /// </summary>
+        public List<KeyValuePair<EmfPlusRecordType, byte[]>> ParseFailedRecords { get; private set; } = new List<KeyValuePair<EmfPlusRecordType, byte[]>>();
         /// <summary>
         /// Initialize the parser. File load is needed.
         /// </summary>
@@ -150,7 +171,7 @@ namespace EMF2StringParser
         }
 
         /// <summary>
-        /// Start parsing the loaded data. Cannot be executed when EMF is not loaded.
+        /// Start parsing the loaded data. Cannot be executed when EMF is not loaded. Every Parsed Datas will be stored in "Parsed(EMFRecordTypeName)".
         /// </summary>
         /// <returns></returns>
         public bool ParseStart()
@@ -162,7 +183,8 @@ namespace EMF2StringParser
             ParsedExtTextOutWs.Clear();
             ParsedSmallTextOuts.Clear();
             ParsedDrawStrings.Clear();
-            ParseFailingLogs.Clear();
+            ParseFailedRecords.Clear();
+            parsedExpectedText = "";
             try
             {
                 dummy.EnumerateMetafile(metafileToParse, new Point(0, 0), metafileDelegate);
@@ -172,7 +194,33 @@ namespace EMF2StringParser
             {
                 throw;
             }
+        }
 
+        /// <summary>
+        /// Experimental : Start parsing and returns string. Every linebreak and space will be determined by Linebreak and Space array properties.
+        /// </summary>
+        /// <returns></returns>
+        public string GetCombinedStringFromLoadedMetaFile()
+        {
+            if (IsLoaded == false)
+            {
+                throw new Exception("EMF File has not Loaded yet.");
+            }
+            ParsedExtTextOutWs.Clear();
+            ParsedSmallTextOuts.Clear();
+            ParsedDrawStrings.Clear();
+            ParseFailedRecords.Clear();
+            parsedExpectedText = "";
+            extractTextMode = true;
+            try
+            {
+                dummy.EnumerateMetafile(metafileToParse, new Point(0, 0), metafileDelegate);
+                return parsedExpectedText;
+            }
+            catch
+            {
+                throw;
+            }
         }
 
         private bool MetafileCallback(EmfPlusRecordType recordType, int flags, int dataSize, IntPtr data, PlayRecordCallback callbackData)
@@ -191,12 +239,19 @@ namespace EMF2StringParser
 
                         string str = Encoding.Unicode.GetString(dataArray, 28, stringLength);
                         ParsedDrawStrings.Add(str);
+
+                        if (extractTextMode)
+                        {
+                            GuessWhiteSpaces();
+
+                            parsedExpectedText += str;
+                        }
                     }
                     catch
                     {
-                        if (isLoggingEnabled)
+                        if (IsFailedParseLoggingEnabled)
                         {
-                            ParseFailingLogs.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
+                            ParseFailedRecords.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
                     }
                 }
@@ -215,12 +270,19 @@ namespace EMF2StringParser
                     {
                         var maybeText = BitConverter.ToChar(dataArray, 28);
                         ParsedSmallTextOuts.Add(maybeText);
+
+                        if (extractTextMode)
+                        {
+                            GuessWhiteSpaces();
+
+                            parsedExpectedText += maybeText;
+                        }
                     }
                     catch
                     {
-                        if (isLoggingEnabled)
+                        if (IsFailedParseLoggingEnabled)
                         {
-                            ParseFailingLogs.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
+                            ParseFailedRecords.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
                     }
                 }
@@ -242,21 +304,60 @@ namespace EMF2StringParser
                         if (txt.Replace(" ", "").Length > 0)
                         {
                             ParsedExtTextOutWs.Add(txt);
+
+                            if (extractTextMode)
+                            {
+                                GuessWhiteSpaces();
+
+                                parsedExpectedText += txt;
+                            }
                         }
                     }
                     catch
                     {
-                        if (isLoggingEnabled)
+                        if (IsFailedParseLoggingEnabled)
                         {
-                            ParseFailingLogs.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
+                            ParseFailedRecords.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
                     }
                 }
+                else
+                {
+                    if (extractTextMode)
+                    {
+                        betweenTextCommands.Add(recordType);
+                    }
+                }
+
             }
 
             metafileToParse.PlayRecord(recordType, flags, dataSize, dataArray);
 
             return true;
+        }
+
+        private void GuessWhiteSpaces()
+        {
+            if (betweenTextCommands != null)
+            {
+                if (LineBreakCandidates != null && betweenTextCommands.Intersect(LineBreakCandidates).Count() > 0)
+                {
+                    parsedExpectedText += "\n";
+                }
+                else if (MustLineBreak != null && betweenTextCommands.Intersect(MustLineBreak).Count() == MustLineBreak.Count())
+                {
+                    parsedExpectedText += "\n";
+                }
+                else if (SpaceCandidates != null && betweenTextCommands.Intersect(SpaceCandidates).Count() > 0)
+                {
+                    parsedExpectedText += " ";
+                }
+                else if (MustSpace != null && betweenTextCommands.Intersect(MustSpace).Count() == MustSpace.Count())
+                {
+                    parsedExpectedText += " ";
+                }
+            }
+            betweenTextCommands.Clear();
         }
     }
 }
