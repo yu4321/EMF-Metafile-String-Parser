@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>EMF2StringParser</id>
+    <version>1.0.1</version>
+    <title>EMF2StringParser</title>
+    <authors>yu4321</authors>
+    <owners>yu4321</owners>
+    <license type="expression">Unlicense</license>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://github.com/yu4321/EMF2StringParser</projectUrl>
+    <description>EMF to String Parser, Only supports some of EMF Record with types which prints text.</description>
+    <releaseNotes></releaseNotes>
+    <copyright>yu4321, 2020</copyright>
+    <tags>EMF SPL</tags>
+    <dependencies>
+      <group targetFramework="net45" >
+      </group>
+    </dependencies>  
+    <icon>
+      images/icontest.png
+    </icon>
+  </metadata>
+  <files>
+    <file src="icontest.png" target="images\" />
+     <file src="bin\Release\EMF2StringParser.dll" target="lib\net45\EMF2StringParser.dll" />
+    <file src="bin\Release\EMF2StringParser.xml" target="lib\net45\EMF2StringParser.xml" />
+  </files>
+</package>
