@@ -19,6 +19,4 @@ A parser which can extract some texts from EMF Metafile and SPL spool file(which
     
 # Notes
 
-  - This class is not tested properly and built for personal usage of contributor. Cannot guarantee the outcome of processed results.
-    - Parse for SmallTextOut is not working properly now.
-    - Parse for DrawString is not tested yet.
+  - This class is built for personal usage of its contributor. Cannot guarantee the consequences of uses.
