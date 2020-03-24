@@ -15,15 +15,14 @@ namespace EMFTest
         {
             var parser = new EMF2StringParser.EMF2StringParser();
             parser.LineBreakCandidates = new[] { EmfPlusRecordType.EmfSelectObject, EmfPlusRecordType.EmfDeleteObject };
-            parser.SpaceCandidates = new[] { EmfPlusRecordType.EmfIntersectClipRect, EmfPlusRecordType.EmfSetTextColor };
+            parser.SpaceCandidates = new[] { EmfPlusRecordType.EmfIntersectClipRect};
             var files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.emf");
             if (files.Count() > 0)
             {
                 foreach(var x in files)
                 {
                     parser.LoadMetaFile(x);
-                    parser.IsFailedParseLoggingEnabled = true;
-                    //parser.ParseStart();
+                    parser.IsParseFailedLoggingEnabled = true;
                     var expected = parser.GetCombinedStringFromLoadedMetaFile();
                     if (expected != null)
                     {

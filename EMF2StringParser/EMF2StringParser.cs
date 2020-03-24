@@ -10,14 +10,29 @@ using static System.Drawing.Graphics;
 
 namespace EMF2StringParser
 {
-    public class EMF2StringParser
+    /// <summary>
+    /// Parser Class for text tags of EMF Metafile.
+    /// </summary>
+    public class EMF2StringParser : IDisposable
     {
         private bool extractTextMode = false;
-        public bool IsLoaded { get; private set; } = false;
-        public bool IsFailedParseLoggingEnabled { get; set; } = false;
+        /// <summary>
+        /// Show parser is ready to be executed or not.
+        /// </summary>
+        public bool IsLoaded
+        {
+            get
+            {
+                return _loadedMetafile != null;
+            }
+        }
+        /// <summary>
+        /// Shows that logging featrue for failed record is enabled or disabled. 
+        /// </summary>
+        public bool IsParseFailedLoggingEnabled { get; set; } = false;
         private Graphics dummy = null;
 
-        public Metafile metafileToParse { get; private set; } = null;
+        private Metafile _loadedMetafile = null;
         private EnumerateMetafileProc metafileDelegate = null;
 
         /// <summary>
@@ -41,10 +56,19 @@ namespace EMF2StringParser
 
         private string parsedExpectedText= "";
 
+        /// <summary>
+        /// Parsed result of ExtTextOutW Records.
+        /// </summary>
         public List<string> ParsedExtTextOutWs { get; private set; } = new List<string>();
 
+        /// <summary>
+        /// Parsed result of DrawString Records.
+        /// </summary>
         public List<string> ParsedDrawStrings { get; private set; } = new List<string>();
 
+        /// <summary>
+        /// Parsed result of SmallTextOut Records.
+        /// </summary>
         public List<char> ParsedSmallTextOuts { get; private set; } = new List<char>();
 
         /// <summary>
@@ -58,6 +82,15 @@ namespace EMF2StringParser
         {
             metafileDelegate = new EnumerateMetafileProc(MetafileCallback);
             dummy = FromImage(new Bitmap(78, 78));
+        }
+
+        /// <summary>
+        /// Unload the loaded file.
+        /// </summary>
+        public void UnloadMetafile()
+        {
+            _loadedMetafile.Dispose();
+            _loadedMetafile = null;
         }
 
         /// <summary>
@@ -75,8 +108,7 @@ namespace EMF2StringParser
         /// <param name="newEmf">EMF file you which want to parse.</param>
         public void LoadMetaFile(Metafile newEmf)
         {
-            metafileToParse = newEmf;
-            IsLoaded = true;
+            _loadedMetafile = newEmf;
         }
 
         /// <summary>
@@ -92,10 +124,26 @@ namespace EMF2StringParser
         /// Ready for parse with given EMF file.
         /// </summary>
         /// <param name="path">Relative path to EMF file you which want to parse.</param>
-        public void LoadMetaFile(string path)
+        /// <param name="isCopyToMemory">If true, file will be loaded via copied by stream.</param>
+        public void LoadMetaFile(string path, bool isCopyToMemory = false)
         {
-            metafileToParse = new Metafile(path);
-            IsLoaded = true;
+            if (isCopyToMemory)
+            {
+                byte[] fileBytes = null;
+                using (FileStream fs = File.Open(path, FileMode.Open))
+                {
+                    fileBytes = new byte[fs.Length];
+                    fs.Read(fileBytes, 0, fileBytes.Length);
+                    using (MemoryStream stream = new MemoryStream(fileBytes))
+                    {
+                        _loadedMetafile = new Metafile(stream);
+                    }
+                }
+            }
+            else
+            {
+                _loadedMetafile = new Metafile(path);
+            }
         }
 
         /// <summary>
@@ -117,9 +165,8 @@ namespace EMF2StringParser
             {
                 using (MemoryStream stream = new MemoryStream(rawData))
                 {
-                    metafileToParse = new Metafile(stream);
+                    _loadedMetafile = new Metafile(stream);
                 }
-                IsLoaded = true;
             }
             catch (Exception e)
             {
@@ -140,7 +187,7 @@ namespace EMF2StringParser
         /// <summary>
         /// Parse the SPL(Spool) File, Extract the EMF File, and LoadMetaFile with Extracted EMF File.
         /// </summary>
-        /// <param name="splPath">Path to SPL spool file</param>
+        /// <param name="splFile">Byte Array of file contents.</param>
         public void LoadFromSPLFile(byte[] splFile)
         {
             LoadMetaFile(ExtractEMFfromSPL(splFile));
@@ -187,7 +234,7 @@ namespace EMF2StringParser
             parsedExpectedText = "";
             try
             {
-                dummy.EnumerateMetafile(metafileToParse, new Point(0, 0), metafileDelegate);
+                dummy.EnumerateMetafile(_loadedMetafile, new Point(0, 0), metafileDelegate);
                 return true;
             }
             catch
@@ -214,7 +261,7 @@ namespace EMF2StringParser
             extractTextMode = true;
             try
             {
-                dummy.EnumerateMetafile(metafileToParse, new Point(0, 0), metafileDelegate);
+                dummy.EnumerateMetafile(_loadedMetafile, new Point(0, 0), metafileDelegate);
                 return parsedExpectedText;
             }
             catch
@@ -249,7 +296,7 @@ namespace EMF2StringParser
                     }
                     catch
                     {
-                        if (IsFailedParseLoggingEnabled)
+                        if (IsParseFailedLoggingEnabled)
                         {
                             ParseFailedRecords.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
@@ -280,7 +327,7 @@ namespace EMF2StringParser
                     }
                     catch
                     {
-                        if (IsFailedParseLoggingEnabled)
+                        if (IsParseFailedLoggingEnabled)
                         {
                             ParseFailedRecords.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
@@ -315,7 +362,7 @@ namespace EMF2StringParser
                     }
                     catch
                     {
-                        if (IsFailedParseLoggingEnabled)
+                        if (IsParseFailedLoggingEnabled)
                         {
                             ParseFailedRecords.Add(new KeyValuePair<EmfPlusRecordType, byte[]>(recordType, dataArray));
                         }
@@ -331,7 +378,7 @@ namespace EMF2StringParser
 
             }
 
-            metafileToParse.PlayRecord(recordType, flags, dataSize, dataArray);
+            _loadedMetafile.PlayRecord(recordType, flags, dataSize, dataArray);
 
             return true;
         }
@@ -359,5 +406,29 @@ namespace EMF2StringParser
             }
             betweenTextCommands.Clear();
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    dummy.Dispose();
+                    _loadedMetafile.Dispose();
+                }
+
+                disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        #endregion
     }
 }
